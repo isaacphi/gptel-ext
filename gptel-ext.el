@@ -34,8 +34,9 @@
   "Directive used before dumping project file text into chat.")
 
 (defvar gptel-ext-project-bottom-prompt
- "Following the same heading format as above, summarize all of the project files.
-More Important files should have longer summaries but none should be more than a couple of paragraphs. The summaries should include information about the interface of each file at the bottom: what are the important functions and constants?"
+ "Summarize all of the project files. Each should have a header such as \"** main.py\"
+More Important files should have longer summaries but none should be more than a couple of paragraphs. Documentation or very standard files should have one line summaries.
+The summaries should include information about the interface of each file at the bottom: what are the important functions and constants?\n"
   "Directive used before dumping project file text into chat.")
 
 ;;;###autoload
