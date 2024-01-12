@@ -1,4 +1,4 @@
-;;; gptel-ext.el --- Extra functions for gptel
+;; gptel-ext.el --- Extra functions for gptel
 
 ;; Author: Phil Isaac <isaac.phil@gmail.com>
 ;; URL: https://github.com/isaacphi/gptel-ext
@@ -11,6 +11,7 @@
 ;;; Code:
 
 (require 'gptel)
+(require 'projectile)
 
 (defgroup gptel-ext nil
   "Extensions for gptel."
@@ -27,6 +28,15 @@
 
 (defvar gptel-ext-rewrite-and-replace-directive "You are a programmer. Re-write this code."
   "Directive to use when replacing code.")
+
+(defvar gptel-ext-project-top-prompt
+  "You will be provided with the full text of files in a software projet. You are to act as a helpful software engineer, providing concise answers about this project.\n"
+  "Directive used before dumping project file text into chat.")
+
+(defvar gptel-ext-project-bottom-prompt
+ "Following the same heading format as above, summarize all of the project files.
+More Important files should have longer summaries but none should be more than a couple of paragraphs. The summaries should include information about the interface of each file at the bottom: what are the important functions and constants?"
+  "Directive used before dumping project file text into chat.")
 
 ;;;###autoload
 (defun gptel-ext-send-whole-buffer ()
@@ -152,5 +162,66 @@ Current buffer is guaranteed to be the response buffer."
         (setq res-beg (next-single-property-change res-beg 'gptel))))))
 
 (add-hook 'gptel-post-response-hook #'gptel-ext-clean-up-gptel-refactored-code)
+
+(defun gptel-ext-project-summary ()
+  (interactive)
+  ;; Check if Projectile is loaded (featurep 'projectile)
+  ;; and if the current buffer is in a Projectile project (projectile-project-p).
+  (unless (and (featurep 'projectile) (projectile-project-p))
+    (error "Projectile is not available, or you're not in a Projectile project"))
+
+  (let* ((buffer-name (read-string "Enter buffer name: " "*GPTel Project*"))
+         (buffer (get-buffer buffer-name)))
+    ;; If buffer exists, pop to the bottom and end the function.
+    (if buffer
+        (progn
+          (pop-to-buffer buffer)
+          (goto-char (point-max))
+          ;; TEMPORARY: always go to this buffer and clear it
+          (erase-buffer))
+      ;; (return))
+      ;; Else, create the buffer.
+      (setq gptel-buffer (get-buffer-create buffer-name))
+      (with-current-buffer gptel-buffer
+        (org-mode)
+        (gptel-mode))))
+
+  ;; If a new buffer is created, continue with setup.
+  (when (buffer-live-p gptel-buffer)
+    ;; Within the buffer, start inserting the content.
+    (with-current-buffer gptel-buffer
+      (insert "* Project Name:" (projectile-project-name) "\n")
+      (insert gptel-ext-project-top-prompt)
+      (insert "** Files:\n")
+      (let ((project-files (projectile-project-files (projectile-project-root))))
+        (dolist (file project-files)
+          (let ((file-type (file-name-extension file)))
+            (insert "*** " file "\n")
+            (condition-case err
+                ;; TODO: use list of files other than org-babel-tangle-lang-exts
+                (if (member file-type (mapcar 'cdr org-babel-tangle-lang-exts))
+                    (progn
+                      (insert "#+BEGIN_SRC " (or (car (rassoc file-type org-babel-tangle-lang-exts)) "text") "\n")
+                      (let ((file-contents (with-temp-buffer
+                                (insert-file-contents (expand-file-name file (projectile-project-root)))
+                                (buffer-string))))
+                        (if (string= file-type "org")
+                            (insert (replace-regexp-in-string "^\*" ",\*" file-contents))
+                          (insert file-contents)))
+                      ;; (insert (with-temp-buffer
+                      ;;           (insert-file-contents (expand-file-name file (projectile-project-root)))
+                      ;;           (buffer-string)))
+                      (insert "#+END_SRC\n\n"))
+                  (insert "File type " file-type " not supported.\n"))
+              (error (insert "Error: Could not load the file contents. " (error-message-string err) "\n")))
+            )))
+      ;; After the file list, prepare the buffer for chat input from the user.
+      (insert (gptel-prompt-prefix-string)))
+      ;; Ask the AI to summarize each file
+      (insert gptel-ext-project-bottom-prompt)
+      (goto-char (point-max))) ;; Move the cursor to the end of the buffer.
+
+    ;; Finally, display the newly populated buffer to the user.
+    (pop-to-buffer gptel-buffer))
 
 (provide 'gptel-extensions)
