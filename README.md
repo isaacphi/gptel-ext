@@ -12,17 +12,20 @@ Jump to the bottom of the buffer and then send the entire buffer.
 
 Load the current buffer into a session so you can ask questions about it.
 
-*** =gptel-ext-rewrite-and-replace=
-
-Rewrite the region or sentence at point and replace it with the response. Extracted from the [[https://github.com/karthink/gptel/wiki][Wiki]].
-
 *** =gptel-ext-quick=
 
 Accept a prompt in the minibuffer and pop up a window with the response. Extracted from the [[https://github.com/karthink/gptel/wiki][Wiki]].
 
+*** =gptel-ext-rewrite-and-replace=
+
+Rewrite the region or sentence at point and replace it with the response. Extracted from the [[https://github.com/karthink/gptel/wiki][Wiki]].
+
 *** =gptel-ext-refactor=
 
 Refactor the region or sentence at point.
+
+** Hooks
+The hook =gptel-ext-clean-up-gptel-refactored-code= was taken from the wiki and added. It automatically cleans up code snippets returned from the LLM.
 
 ** Variables
 
@@ -55,6 +58,15 @@ Directive to use when refactoring code. Defaults to:
 #+BEGIN_EXAMPLE
 You are a programmer. Refactor my code to improve readability. Reply only with the code.
 #+END_EXAMPLE
+
+*** =gptel-ext-rewrite-and-replace-directive=
+
+Directive to use when calling =gptel-ext-rewrite-and-replace=. Defaults to:
+
+#+BEGIN_EXAMPLE
+You are a programmer. Re-write this code.
+#+END_EXAMPLE
+
 
 ** Credits
 

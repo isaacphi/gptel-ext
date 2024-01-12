@@ -25,7 +25,7 @@
 (defvar gptel-ext-refactor-directive "You are a programmer. Refactor my code to improve readability. Reply only with the code."
   "Directive to use when refactoring code.")
 
-(defvar gptel-ext-rewrite-and-replace "You are a programmer. Re-write this code."
+(defvar gptel-ext-rewrite-and-replace-directive "You are a programmer. Re-write this code."
   "Directive to use when replacing code.")
 
 ;;;###autoload
@@ -85,10 +85,10 @@
       (list (bounds-of-thing-at-point 'sentence)))
      (t (cons (line-beginning-position) (line-end-position))))
     (and current-prefix-arg
-         (read-string gptel-ext-rewrite-and-replace))))
+         (read-string gptel-ext-rewrite-and-replace-directive))))
   (gptel-request
    (buffer-substring-no-properties (car bounds) (cdr bounds)) ;the prompt
-   :system (or directive gptel-ext-rewrite-and-replace))
+   :system (or directive gptel-ext-rewrite-and-replace-directive))
    :buffer (current-buffer)
    :context (cons (set-marker (make-marker) (car bounds))
                   (set-marker (make-marker) (cdr bounds)))
