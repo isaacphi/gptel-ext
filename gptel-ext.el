@@ -229,8 +229,6 @@ Current buffer is guaranteed to be the response buffer."
   (pop-to-buffer gptel-buffer))
 
 (cl-defun cowsay (&key term)
-  "Prints the term with a cow saying it"
-  (interactive "sEnter your message: ")
   (let* ((bubble-top (concat " " (make-string (+ (length term) 2) ?_) "\n"))
          (bubble-middle (format "< %s >\n" term))
          (bubble-bottom (concat " " (make-string (+ (length term) 2) ?-) "\n"))
@@ -248,8 +246,6 @@ Current buffer is guaranteed to be the response buffer."
   (other-window 1)
   (find-file filename)
   (message "File '%s' created and opened." filename))
-
-(create-file :filename "myfile.txt" :contents "file contents\nhello")
 
 (defun cons-list-to-plist (cons-list)
   (let ((plist '()))
