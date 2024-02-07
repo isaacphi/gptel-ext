@@ -34,7 +34,7 @@
   "Directive used before dumping project file text into chat.")
 
 (defvar gptel-ext-project-bottom-prompt
- "Summarize all of the project files. Each should have a header such as \"** main.py\"
+  "Summarize all of the project files. Each should have a header that starts with \"*** \" such as \"*** main.py\"
 More Important files should have longer summaries but none should be more than a couple of paragraphs. Documentation or very standard files should have one line summaries.
 The summaries should include information about the interface of each file at the bottom: what are the important functions and constants?\n"
   "Directive used before dumping project file text into chat.")
@@ -68,20 +68,20 @@ The summaries should include information about the interface of each file at the
   (interactive (list (read-string "Ask: " nil gptel-quick--history)))
   (when (string= prompt "") (user-error "A prompt is required."))
   (gptel-request
-   prompt
-   :callback
-   (lambda (response info)
-     (if (not response)
-         (message "gptel-ext-quick failed with message: %s" (plist-get info :status))
-       (with-current-buffer (get-buffer-create "*gptel-quick*")
-         (let ((inhibit-read-only t))
-           (erase-buffer)
-           (insert response))
-         (special-mode)
-         (display-buffer (current-buffer)
-                         `((display-buffer-in-side-window)
-                           (side . bottom)
-                           (window-height . ,#'fit-window-to-buffer))))))))
+      prompt
+    :callback
+    (lambda (response info)
+      (if (not response)
+          (message "gptel-ext-quick failed with message: %s" (plist-get info :status))
+        (with-current-buffer (get-buffer-create "*gptel-quick*")
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert response))
+          (special-mode)
+          (display-buffer (current-buffer)
+                          `((display-buffer-in-side-window)
+                            (side . bottom)
+                            (window-height . ,#'fit-window-to-buffer))))))))
 
 ;; extracted from the wiki
 ;;
@@ -98,27 +98,27 @@ The summaries should include information about the interface of each file at the
     (and current-prefix-arg
          (read-string gptel-ext-rewrite-and-replace-directive))))
   (gptel-request
-   (buffer-substring-no-properties (car bounds) (cdr bounds)) ;the prompt
-   :system (or directive gptel-ext-rewrite-and-replace-directive))
-   :buffer (current-buffer)
-   :context (cons (set-marker (make-marker) (car bounds))
-                  (set-marker (make-marker) (cdr bounds)))
-   :callback
-   (lambda (response info)
-     (if (not response)
-         (message "Chat response failed with: %s" (plist-get info :status))
-       (let* ((bounds (plist-get info :context))
-              (beg (car bounds))
-              (end (cdr bounds))
-              (buf (plist-get info :buffer)))
-         (with-current-buffer buf
-           (save-excursion
-             (goto-char beg)
-             (kill-region beg end)
-             (insert response)
-             (set-marker beg nil)
-             (set-marker end nil)
-             (message "Rewrote line. Original line saved to kill-ring.")))))))
+      (buffer-substring-no-properties (car bounds) (cdr bounds)) ;the prompt
+    :system (or directive gptel-ext-rewrite-and-replace-directive))
+  :buffer (current-buffer)
+  :context (cons (set-marker (make-marker) (car bounds))
+                 (set-marker (make-marker) (cdr bounds)))
+  :callback
+  (lambda (response info)
+    (if (not response)
+        (message "Chat response failed with: %s" (plist-get info :status))
+      (let* ((bounds (plist-get info :context))
+             (beg (car bounds))
+             (end (cdr bounds))
+             (buf (plist-get info :buffer)))
+        (with-current-buffer buf
+          (save-excursion
+            (goto-char beg)
+            (kill-region beg end)
+            (insert response)
+            (set-marker beg nil)
+            (set-marker end nil)
+            (message "Rewrote line. Original line saved to kill-ring.")))))))
 
 ;;;###autoload
 (defun gptel-ext-refactor (bounds)
@@ -194,35 +194,92 @@ Current buffer is guaranteed to be the response buffer."
       (insert "* Project Name:" (projectile-project-name) "\n")
       (insert gptel-ext-project-top-prompt)
       (insert "** Files:\n")
+      (print (projectile-project-root))
+      (print (projectile-project-files (projectile-project-root)))
       (let ((project-files (projectile-project-files (projectile-project-root))))
         (dolist (file project-files)
           (let ((file-type (file-name-extension file)))
             (insert "*** " file "\n")
             (condition-case err
                 ;; TODO: use list of files other than org-babel-tangle-lang-exts
-                (if (member file-type (mapcar 'cdr org-babel-tangle-lang-exts))
+                (if (or (equal file-type nil) (member file-type (mapcar 'cdr org-babel-tangle-lang-exts)))
                     (progn
                       (insert "#+BEGIN_SRC " (or (car (rassoc file-type org-babel-tangle-lang-exts)) "text") "\n")
                       (let ((file-contents (with-temp-buffer
-                                (insert-file-contents (expand-file-name file (projectile-project-root)))
-                                (buffer-string))))
-                        (if (string= file-type "org")
-                            (insert (replace-regexp-in-string "^\*" ",\*" file-contents))
-                          (insert file-contents)))
+                                             (insert-file-contents (expand-file-name file (projectile-project-root)))
+                                             (buffer-string))))
+                        ;; replace lines starting with "*" with ".*" to preserve org formatting
+                        (insert (replace-regexp-in-string "^\*" ",\*" file-contents)))
                       ;; (insert (with-temp-buffer
                       ;;           (insert-file-contents (expand-file-name file (projectile-project-root)))
                       ;;           (buffer-string)))
                       (insert "#+END_SRC\n\n"))
-                  (insert "File type " file-type " not supported.\n"))
+                  (insert "File type " file-type " not listed in org-babel-tangle-lang-exts.\n"))
               (error (insert "Error: Could not load the file contents. " (error-message-string err) "\n")))
             )))
       ;; After the file list, prepare the buffer for chat input from the user.
+      (insert "* Summary:\n")
       (insert (gptel-prompt-prefix-string)))
-      ;; Ask the AI to summarize each file
-      (insert gptel-ext-project-bottom-prompt)
-      (goto-char (point-max))) ;; Move the cursor to the end of the buffer.
+    ;; Ask the AI to summarize each file
+    (insert gptel-ext-project-bottom-prompt)
+    (sit-for 0)
+    (goto-char (point-max))) ;; Move the cursor to the end of the buffer.
 
-    ;; Finally, display the newly populated buffer to the user.
-    (pop-to-buffer gptel-buffer))
+  ;; Finally, display the newly populated buffer to the user.
+  (pop-to-buffer gptel-buffer))
+
+(cl-defun cowsay (&key term)
+  "Prints the term with a cow saying it"
+  (interactive "sEnter your message: ")
+  (let* ((bubble-top (concat " " (make-string (+ (length term) 2) ?_) "\n"))
+         (bubble-middle (format "< %s >\n" term))
+         (bubble-bottom (concat " " (make-string (+ (length term) 2) ?-) "\n"))
+         (cow "        \\   ^__^\n         \\  (oo)\\_______\n            (__)\\       )\\/\\\n                ||----w |\n                ||     ||"))
+    (message "%s%s%s%s" bubble-top bubble-middle bubble-bottom cow)))
+
+(cl-defun create-file (&key filename contents)
+  "Create a file with FILENAME and CONTENTS, and open it in a new buffer."
+  (interactive "sEnter filename: \nMEnter contents: ")
+  (if (not (file-exists-p filename))
+      (with-temp-buffer
+        (insert contents)
+        (write-file filename)))
+  (split-window)
+  (other-window 1)
+  (find-file filename)
+  (message "File '%s' created and opened." filename))
+
+(create-file :filename "myfile.txt" :contents "file contents\nhello")
+
+(defun cons-list-to-plist (cons-list)
+  (let ((plist '()))
+    (dolist (item cons-list)
+      (setq plist (plist-put plist (if (keywordp (car item))
+                                       (car item)
+                                     (intern (concat ":" (symbol-name (car item)))))
+                             (cdr item))))
+    plist))
+
+(cl-defun gptel-run-function (prompt)
+  (interactive (list (read-string "Ask GPTel to do something: " nil)))
+  (when (string= prompt "") (user-error "A prompt is required."))
+  (gptel-request
+      prompt
+    :callback
+    (lambda (response info)
+      (let* ((parsed (ignore-errors (read response)))
+             (is-vector (vectorp parsed)))
+        (if is-vector
+            (let* ((plist (aref parsed 0))
+                   (is-function-call (string= (plist-get plist :type) "function")))
+              (if is-function-call
+                  (let* ((function-data (plist-get plist :function))
+                         (function-name (plist-get function-data :name))
+                         (arguments-json (plist-get function-data :arguments))
+                         (arguments (json-read-from-string arguments-json)))
+                    (when (yes-or-no-p (format "Call function `%s` with arguments %s?" function-name arguments-json))
+                      (when (fboundp (intern function-name))
+                        (apply (intern function-name) (cons-list-to-plist arguments)))))))
+          (message response))))))
 
 (provide 'gptel-extensions)
